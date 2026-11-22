@@ -1418,7 +1418,9 @@
                     if (AudioCtx) this.audioCtx = new AudioCtx();
                 }
                 if (this.audioCtx && this.audioCtx.state === 'suspended' && !window.__nativePaused) {
-                    this.audioCtx.resume();
+                    this.audioCtx.resume().then(() => {
+                        if (this.ambientEnabled && !this.ambientTimer) this.syncAmbientMusic();
+                    }).catch(() => {});
                 }
             }
 
@@ -3200,6 +3202,12 @@
                 window.addEventListener('pagehide', () => {
                     if (this.phase === 'PLAYER' || this.phase === 'HQ') this.saveActiveRunState();
                 });
+                const unlockAmbient = () => {
+                    this.ensureAudioContext();
+                    if (this.ambientEnabled && !this.ambientTimer) this.syncAmbientMusic();
+                };
+                document.addEventListener('pointerdown', unlockAmbient, { once: true, capture: true });
+                document.addEventListener('keydown', unlockAmbient, { once: true, capture: true });
             }
 
             resizeCanvas() {
@@ -4649,6 +4657,7 @@
                 king.x = rook.x; king.y = rook.y;
                 rook.x = tx; rook.y = ty;
                 this.resolveTileHazardAfterStep(king, tx, ty);
+                if (this.phase === 'GAMEOVER') return;
                 this.resolveTileHazardAfterStep(rook, rookX, rookY);
                 if (this.phase === 'GAMEOVER') return;
                 this.playSound('move');
@@ -6094,7 +6103,7 @@
                 if (spot) {
                     this.gold -= cost;
                     this.playSound('coin');
-                    const bonusHp = (this.hasTalent('def_1') ? 3 : 0) + (this.hasTalent('def_6') ? 2 : 0);
+                    const bonusHp = (this.hasTalent('def_1') ? 3 : 0) + (this.hasTalent('def_6') ? 2 : 0) + (this.getActiveChapterModifier().id === 'TITAN_WALL' ? 2 : 0);
                     const bonusAtk = (this.hasTalent('war_1') ? 1 : 0) + (this.hasTalent('war_6') ? 1 : 0);
                     const h = { PAWN: 4, KNIGHT: 5, BISHOP: 4, ROOK: 7, QUEEN: 8 };
                     const a = { PAWN: 2, KNIGHT: 3, BISHOP: 3, ROOK: 3, QUEEN: 5 };
@@ -6161,6 +6170,9 @@
                 }
                 this.chapter++;
                 this.wave = 1;
+                if (this.getActiveChapterModifier().id === 'TITAN_WALL') {
+                    this.pieces.forEach(p => { if (p.team === 'ALLY') { p.maxHp += 2; p.hp += 2; } });
+                }
                 this.snapshotChapterStartAllies();
                 this.generateBiomeSpecialTiles();
                 this.apply3DBiomeColors(true);

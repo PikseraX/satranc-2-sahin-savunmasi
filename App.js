@@ -131,6 +131,7 @@ export default function App() {
       interstitialCleanupRef.current();
       interstitialCleanupRef.current = null;
     }
+    interstitialRef.current = null;
   }, []);
 
   const preloadInterstitial = useCallback(() => {
@@ -226,12 +227,15 @@ export default function App() {
     });
     const unsubError = ad.addAdEventListener(AdEventType.ERROR, () => {
       const pendingType = rewardedPendingTypeRef.current;
+      const wasShowing = rewardedShowingRef.current;
       rewardedLoadingRef.current = false;
       rewardedLoadedRef.current = false;
       rewardedShowingRef.current = false;
       rewardedEarnedRef.current = false;
       rewardedPendingTypeRef.current = null;
-      setAudioPaused(false);
+      if (wasShowing && !interstitialShowingRef.current) {
+        setAudioPaused(false);
+      }
       if (pendingType) {
         notifyRewardFailed('Video şu an gösterilemedi.');
       }
