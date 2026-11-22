@@ -253,6 +253,9 @@
             <button id="btn-sound-toggle" onclick="window.game && window.game.toggleSound()" class="px-2 py-0.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[9.5px] font-extrabold border border-amber-500/40 transition">
                 🔊 Ses Açık
             </button>
+            <button id="btn-music-toggle" onclick="window.game && window.game.toggleAmbientMusic()" class="px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-[9.5px] font-extrabold border border-slate-700 transition" title="Ortam Müziği">
+                🎵 Müzik: Kapalı
+            </button>
             <button id="btn-speed-toggle" onclick="window.game && window.game.toggleEnemySpeed()" class="px-2 py-0.5 rounded-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[9.5px] font-extrabold border border-sky-500/40 transition" title="Düşman Turu Hızı">
                 ⏩ Hız: 1x
             </button>
@@ -638,6 +641,31 @@
                     <span class="text-lg">🌐</span>
                     <span id="btn-lang-splash-code" class="text-[9px] font-black text-cyan-300">TR</span>
                 </button>
+            </div>
+            <div class="mt-2.5 flex flex-wrap justify-center gap-2">
+                <button id="btn-feedback" type="button" onclick="window.ReactNativeWebView ? window.ReactNativeWebView.postMessage(JSON.stringify({type:'feedback'})) : (window.location.href='mailto:pikserax@gmail.com?subject=Satranc%202%20Geri%20Bildirim')" class="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-amber-500/40 text-[10px] font-bold text-amber-300 hover:bg-slate-700 transition">
+                    💬 Geri Bildirim
+                </button>
+                <button id="btn-open-privacy" type="button" onclick="document.getElementById('privacy-modal').classList.remove('hidden')" class="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-[10px] font-bold text-slate-300 hover:bg-slate-700 transition">
+                    🔒 Gizlilik Politikası
+                </button>
+                <button id="btn-privacy-options" type="button" onclick="window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({type:'privacy_options'}))" class="hidden px-3 py-1.5 rounded-lg bg-indigo-950/70 border border-indigo-500/40 text-[10px] font-bold text-indigo-300 hover:bg-indigo-900/60 transition">
+                    🛡️ Reklam Gizlilik Tercihleri
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GİZLİLİK POLİTİKASI MODALI -->
+    <div id="privacy-modal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="w-full max-w-md max-h-[82vh] overflow-y-auto rounded-2xl bg-slate-900 border border-slate-700 p-5 space-y-3 shadow-2xl text-left">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-black text-amber-400">🔒 Gizlilik Politikası / Privacy Policy</h3>
+                <button type="button" onclick="document.getElementById('privacy-modal').classList.add('hidden')" class="w-8 h-8 rounded-full bg-slate-800 text-slate-300 font-black">✕</button>
+            </div>
+            <div class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                <p><strong>TR:</strong> Satranç 2: Şah'ın Savunması çevrimdışı oynanabilen bir taktiksel satranç savunma oyunudur. İlerlemeniz, yetenek ağacı, Ruh Taşları ve ayarlarınız yalnızca kendi cihazınızda saklanır. Ücretsiz sürümde Google AdMob reklamları gösterilebilir; Avrupa/AEA kullanıcıları ana menüdeki <em>Reklam Gizlilik Tercihleri</em> seçeneğinden izinlerini diledikleri zaman değiştirebilir. Uygulama içi satın alımlar Google Play veya Apple App Store üzerinden güvenle işlenir.</p>
+                <p><strong>EN:</strong> Chess 2: King's Defense is an offline tactical chess defense game. Your progress, talent tree, Soul Gems, and settings are stored locally on your device only. The free version may show Google AdMob ads; EEA/UK users can update consent anytime via <em>Ad Privacy Options</em> on the main menu. In-app purchases are securely processed by Google Play or Apple App Store.</p>
             </div>
         </div>
     </div>
@@ -1261,9 +1289,11 @@
                 this.isDailySiegeMode = false;
                 this.dailySiegeRule = null;
                 this.dailySiegeCompletedDate = '';
+                this.ambientEnabled = false;
                 try {
                     this.fastSpeed = localStorage.getItem('satranc2_fast_speed') === '1';
                     this.hapticsEnabled = localStorage.getItem('satranc2_haptics') !== '0';
+                    this.ambientEnabled = localStorage.getItem('chess_defense_ambient') === '1';
                     this.dailySiegeCompletedDate = localStorage.getItem('satranc2_daily_siege_done') || '';
                 } catch (e) {}
                 this.boardZoom = 1.0;
@@ -1387,7 +1417,7 @@
                     const AudioCtx = window.AudioContext || window.webkitAudioContext;
                     if (AudioCtx) this.audioCtx = new AudioCtx();
                 }
-                if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                if (this.audioCtx && this.audioCtx.state === 'suspended' && !window.__nativePaused) {
                     this.audioCtx.resume();
                 }
             }
@@ -1401,7 +1431,48 @@
                         ? 'px-2 py-0.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[9.5px] font-extrabold border border-amber-500/40 transition'
                         : 'px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[9.5px] font-bold border border-slate-700 transition';
                 }
+                this.syncAmbientMusic();
                 if (this.soundEnabled) this.playSound('select');
+            }
+
+            toggleAmbientMusic() {
+                this.ambientEnabled = !this.ambientEnabled;
+                try { localStorage.setItem('chess_defense_ambient', this.ambientEnabled ? '1' : '0'); } catch (e) {}
+                this.syncUtilityToggleButtons();
+                this.syncAmbientMusic();
+            }
+
+            syncAmbientMusic() {
+                if (this.ambientTimer) {
+                    clearInterval(this.ambientTimer);
+                    this.ambientTimer = null;
+                }
+                if (!this.ambientEnabled || !this.soundEnabled || window.__nativePaused || (typeof document !== 'undefined' && document.hidden)) return;
+                const playChord = () => {
+                    if (!this.ambientEnabled || !this.soundEnabled || window.__nativePaused || (typeof document !== 'undefined' && document.hidden)) return;
+                    try {
+                        this.ensureAudioContext();
+                        if (!this.audioCtx || this.audioCtx.state !== 'running') return;
+                        const chords = [[146.83, 220.0, 293.66], [174.61, 220.0, 261.63], [130.81, 196.0, 261.63], [164.81, 220.0, 329.63]];
+                        this.ambientStep = ((this.ambientStep || 0) + 1) % chords.length;
+                        const now = this.audioCtx.currentTime;
+                        chords[this.ambientStep].forEach(freq => {
+                            const osc = this.audioCtx.createOscillator();
+                            const gain = this.audioCtx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(freq, now);
+                            gain.gain.setValueAtTime(0.0001, now);
+                            gain.gain.exponentialRampToValueAtTime(0.018, now + 0.8);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.4);
+                            osc.connect(gain);
+                            gain.connect(this.audioCtx.destination);
+                            osc.start(now);
+                            osc.stop(now + 3.5);
+                        });
+                    } catch (e) {}
+                };
+                playChord();
+                this.ambientTimer = setInterval(playChord, 3600);
             }
 
             triggerHaptic(style = 'light') {
@@ -1432,6 +1503,13 @@
                     hBtn.className = this.hapticsEnabled
                         ? 'px-2 py-0.5 rounded-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[9.5px] font-extrabold border border-purple-500/40 transition'
                         : 'px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[9.5px] font-bold border border-slate-700 transition';
+                }
+                const mBtn = document.getElementById('btn-music-toggle');
+                if (mBtn) {
+                    mBtn.textContent = this.ambientEnabled ? '🎵 Müzik: Açık' : '🎵 Müzik: Kapalı';
+                    mBtn.className = this.ambientEnabled
+                        ? 'px-2 py-0.5 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[9.5px] font-extrabold border border-emerald-500/40 transition'
+                        : 'px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-[9.5px] font-extrabold border border-slate-700 transition';
                 }
             }
 
@@ -3108,11 +3186,15 @@
                 document.addEventListener('visibilitychange', () => {
                     if (document.hidden) {
                         if (this.phase === 'PLAYER' || this.phase === 'HQ') this.saveActiveRunState();
+                        this.syncAmbientMusic();
                         if (this.audioCtx && this.audioCtx.state === 'running') {
                             this.audioCtx.suspend().catch(() => {});
                         }
-                    } else if (this.audioCtx && this.audioCtx.state === 'suspended' && this.soundEnabled) {
-                        this.audioCtx.resume().catch(() => {});
+                    } else if (!window.__nativePaused) {
+                        if (this.audioCtx && this.audioCtx.state === 'suspended' && this.soundEnabled) {
+                            this.audioCtx.resume().catch(() => {});
+                        }
+                        this.syncAmbientMusic();
                     }
                 });
                 window.addEventListener('pagehide', () => {
@@ -3464,7 +3546,7 @@
             }
 
             hideAllGameModals() {
-                ['splash-screen', 'hq-modal', 'decree-modal', 'promotion-modal', 'chapter-clear-modal', 'gameover-modal', 'codex-modal', 'talent-modal', 'rules-modal', 'shop-modal'].forEach(id => {
+                ['splash-screen', 'privacy-modal', 'hq-modal', 'decree-modal', 'promotion-modal', 'chapter-clear-modal', 'gameover-modal', 'codex-modal', 'talent-modal', 'rules-modal', 'shop-modal'].forEach(id => {
                     document.getElementById(id)?.classList.add('hidden');
                 });
             }
@@ -7106,6 +7188,12 @@
             if (window.game && typeof window.game.showBanner === 'function') {
                 window.game.showBanner('🎬 ÖDÜLLÜ VİDEO', msg || 'Video şu an hazır değil.');
             }
+        };
+        window.__onNativePrivacyState = function(payload) {
+            const btn = document.getElementById('btn-privacy-options');
+            if (!btn) return;
+            if (payload && payload.required) btn.classList.remove('hidden');
+            else btn.classList.add('hidden');
         };
     </script>
     <script src="./i18n.js"></script>

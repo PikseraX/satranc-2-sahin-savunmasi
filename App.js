@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, BackHandler, Platform, StatusBar, StyleSheet, Vibration, View } from 'react-native';
+import { AppState, BackHandler, Linking, Platform, StatusBar, StyleSheet, Vibration, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
@@ -61,6 +61,7 @@ export default function App() {
   const rewardedEarnedRef = useRef(false);
   const adsInitStartedRef = useRef(false);
   const adsInitializedRef = useRef(false);
+  const privacyOptionsRequiredRef = useRef(false);
 
   const iapReadyRef = useRef(false);
   const iapInitPromiseRef = useRef(null);
@@ -108,11 +109,15 @@ export default function App() {
     webViewRef.current?.injectJavaScript(`
       (function(){
         try {
-          if (window.game && window.game.audioCtx) {
-            if (${paused ? 'true' : 'false'}) {
-              if (window.game.audioCtx.state === 'running') window.game.audioCtx.suspend().catch(function(){});
-            } else if (window.game.audioCtx.state === 'suspended' && window.game.soundEnabled) {
-              window.game.audioCtx.resume().catch(function(){});
+          window.__nativePaused = ${paused ? 'true' : 'false'};
+          if (window.game) {
+            if (typeof window.game.syncAmbientMusic === 'function') window.game.syncAmbientMusic();
+            if (window.game.audioCtx) {
+              if (${paused ? 'true' : 'false'}) {
+                if (window.game.audioCtx.state === 'running') window.game.audioCtx.suspend().catch(function(){});
+              } else if (window.game.audioCtx.state === 'suspended' && window.game.soundEnabled) {
+                window.game.audioCtx.resume().catch(function(){});
+              }
             }
           }
         } catch (e) {}
@@ -270,6 +275,27 @@ export default function App() {
     }
   }, [notifyRewardFailed, preloadRewarded, setAudioPaused]);
 
+  const pushPrivacyStateToWebView = useCallback((required) => {
+    if (typeof required === 'boolean') {
+      privacyOptionsRequiredRef.current = required;
+    }
+    if (!webViewLoadedRef.current || !webViewRef.current) return;
+    const payload = JSON.stringify({ required: !!privacyOptionsRequiredRef.current });
+    webViewRef.current.injectJavaScript(
+      `if (typeof window.__onNativePrivacyState === 'function') window.__onNativePrivacyState(${payload}); true;`
+    );
+  }, []);
+
+  const openPrivacyOptionsForm = useCallback(async () => {
+    try {
+      await AdsConsent.showPrivacyOptionsForm();
+      const updated = await AdsConsent.requestInfoUpdate().catch(() => null);
+      if (updated) {
+        pushPrivacyStateToWebView(updated.privacyOptionsRequirementStatus === 'REQUIRED');
+      }
+    } catch {}
+  }, [pushPrivacyStateToWebView]);
+
   const initAdsIfNeeded = useCallback(async () => {
     if (adFreeRef.current) return;
     if (adsInitializedRef.current) {
@@ -284,8 +310,10 @@ export default function App() {
     if (adsInitStartedRef.current) return;
     adsInitStartedRef.current = true;
     try {
-      await AdsConsent.requestInfoUpdate().catch(() => {});
-      await AdsConsent.loadAndShowConsentFormIfRequired().catch(() => {});
+      const consentInfo = await AdsConsent.requestInfoUpdate().catch(() => null);
+      const afterForm = await AdsConsent.loadAndShowConsentFormIfRequired().catch(() => consentInfo);
+      const finalInfo = afterForm || consentInfo;
+      pushPrivacyStateToWebView(finalInfo?.privacyOptionsRequirementStatus === 'REQUIRED');
       await mobileAds().initialize();
       adsInitializedRef.current = true;
       if (!mountedRef.current || adFreeRef.current) return;
@@ -295,7 +323,7 @@ export default function App() {
     } catch {
       adsInitStartedRef.current = false;
     }
-  }, [preloadInterstitial, preloadRewarded]);
+  }, [preloadInterstitial, preloadRewarded, pushPrivacyStateToWebView]);
 
   const persistAdFree = useCallback(async (enabled) => {
     adFreeRef.current = enabled;
@@ -624,9 +652,13 @@ export default function App() {
         webViewRef.current?.injectJavaScript(`
           (function(){
             try {
+              window.__nativePaused = true;
               if (window.game) {
                 if (window.game.phase === 'PLAYER' || window.game.phase === 'HQ') {
                   window.game.saveActiveRunState();
+                }
+                if (typeof window.game.syncAmbientMusic === 'function') {
+                  window.game.syncAmbientMusic();
                 }
                 if (window.game.audioCtx && window.game.audioCtx.state === 'running') {
                   window.game.audioCtx.suspend().catch(function(){});
@@ -655,7 +687,7 @@ export default function App() {
       webViewRef.current?.injectJavaScript(`
         (function(){
           try {
-            var closeable = ['lang-modal', 'guide-modal', 'shop-modal', 'rules-modal', 'codex-modal', 'talent-modal', 'promotion-modal'];
+            var closeable = ['privacy-modal', 'lang-modal', 'guide-modal', 'shop-modal', 'rules-modal', 'codex-modal', 'talent-modal', 'promotion-modal'];
             for (var i = 0; i < closeable.length; i++) {
               var el = document.getElementById(closeable[i]);
               if (el && !el.classList.contains('hidden')) {
@@ -721,9 +753,13 @@ export default function App() {
         } catch {}
       } else if (msg.type === 'iap') {
         void handleIapAction(msg.action, msg.productId);
+      } else if (msg.type === 'privacy_options') {
+        void openPrivacyOptionsForm();
+      } else if (msg.type === 'feedback') {
+        Linking.openURL('mailto:pikserax@gmail.com?subject=Satranc%202%20Geri%20Bildirim').catch(() => {});
       }
     } catch {}
-  }, [handleIapAction, tryShowInterstitial, tryShowRewarded]);
+  }, [handleIapAction, openPrivacyOptionsForm, tryShowInterstitial, tryShowRewarded]);
 
   return (
     <SafeAreaProvider>
@@ -743,6 +779,7 @@ export default function App() {
             onLoadEnd={() => {
               webViewLoadedRef.current = true;
               pushIapStateToWebView();
+              pushPrivacyStateToWebView();
               void flushPendingConsumables();
             }}
             onMessage={handleMessage}

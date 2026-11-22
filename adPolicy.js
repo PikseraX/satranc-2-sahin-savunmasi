@@ -1,8 +1,8 @@
-// Geçiş reklamı sıklık kuralı (ilk 2 dalga yok; sonrası >= 3 dalga VE >= 3 dakika).
+// Geçiş reklamı sıklık kuralı (ilk 2 dalga yok; sonrası >= 3 dalga VE >= 5 dakika).
 const DEFAULT_CONFIG = {
   onboardingFreeRounds: 2,
   minRoundsBetweenInterstitial: 3,
-  minCooldownMs: 3 * 60 * 1000,
+  minCooldownMs: 5 * 60 * 1000,
 };
 
 function createAdPolicy(config = {}, now = () => Date.now()) {
