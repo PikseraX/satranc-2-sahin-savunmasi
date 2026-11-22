@@ -1,0 +1,17 @@
+node_modules/
+.expo/
+generated/
+dist/
+android/
+ios/
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+*.aab
+*.apk
+credentials.json
+.env*
+npm-debug.log*
+

@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Satranç 2: Şah'ın Savunması",
+    "slug": "satranc-2-sahin-savunmasi",
+    "version": "1.0.0",
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "android": {
+      "package": "pikserax.satranc2"
+    },
+    "ios": {
+      "bundleIdentifier": "pikserax.satranc2",
+      "buildNumber": "1",
+      "icon": "./assets/ios-icon.png",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "delayAppMeasurementInit": true,
+          "userTrackingUsageDescription": "Bu tanımlayıcı size daha alakalı reklamlar sunmak için kullanılır.",
+          "skAdNetworkItems": [
+            "cstr6suwn9.skadnetwork",
+            "4fzdc2evr5.skadnetwork",
+            "2fnua5tdw4.skadnetwork",
+            "ydx93a7ass.skadnetwork",
+            "p78axxw29g.skadnetwork",
+            "v72qych5uu.skadnetwork",
+            "ludvb6z3bs.skadnetwork",
+            "cp8zw746q7.skadnetwork",
+            "3sh42y64q3.skadnetwork",
+            "c6k4g5qg8m.skadnetwork"
+          ]
+        }
+      ]
+    ]
+  }
+}
